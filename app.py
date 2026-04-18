@@ -1,94 +1,81 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
+import folium
+from streamlit_folium import st_folium
 
-# 1. Configuración de la página y Estética
-st.set_page_config(page_title="Proyecto Transporte Cerrillos", layout="wide")
+st.set_page_config(
+    page_title="Cerrillos Connect",
+    page_icon="🚌",
+    layout="wide",
+)
 
-# Estilo personalizado simple
 st.markdown("""
     <style>
-    .main { background-color: #f8f9fa; }
-    .stMetric { background-color: #ffffff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .main {
+        background-color: #f5f7f9;
+    }
+    .stMetric {
+        background-color: #ffffff;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Título e Introducción
-st.title("🚇 Cerrillos Conectado: Ingeniería Civil Informática")
-st.write("---")
+st.title("📊 Cerrillos Connect: Dashboard de Movilidad")
+st.write("Visualización en tiempo real de nodos críticos y tiempos de espera en la comuna.")
 
-# 3. Métricas de Impacto (Lo que más le gusta a los profes)
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric(label="Puntos Críticos Detectados", value="5", delta="Comuna Cerrillos")
-with col2:
-    st.metric(label="Ahorro de Tiempo Estimado", value="35%", delta="Optimización")
-with col3:
-    st.metric(label="Reducción de CO2", value="12%", delta="Sustentable")
-
-st.write("---")
-
-# 4. Sección de Mapa de Congestión
-st.header("📍 Mapa de Puntos Críticos en Cerrillos")
-st.info("Este mapa muestra las zonas donde el flujo vehicular colapsa en hora punta (07:00 - 09:00 AM).")
-
-# Coordenadas reales aproximadas de Cerrillos
-# Reemplaza tu diccionario de datos con este para incluir ese punto exacto:
-data_cerrillos = {
+data_dict = {
     'lat': [
-        -33.482917, # El punto que me pasaste (Av. PAC / Departamental)
+        -33.482917, # Cruce PAC / Departamental
         -33.483538, # Metro Cerrillos
-        -33.490639, # cruce
-        -33.508500  # Municipalidad de Cerrillos
+        -33.490639, # Cruce Lo Errazuriz
+        -33.508500  # Plaza Cerrillos
     ],
     'lon': [
-        -70.696389, # El punto que me pasaste (Av. PAC / Departamental)
-        -70.694962, # Metro Cerrillos
-        -70.722712, # cruce
-        -70.716200  # Municipalidad
+        -70.696389, 
+        -70.694962, 
+        -70.722712, 
+        -70.716200
     ],
     'nombre': [
         'Cruce PAC / Departamental', 
         'Metro Cerrillos', 
-        'Cruce lo errazuriz', 
+        'Cruce Lo Errázuriz', 
         'Plaza Cerrillos'
-    ]
+    ],
+    'espera_actual': [12, 8, 20, 15]
 }
-df_mapa = pd.DataFrame(data_cerrillos)
-# Dibujar mapa
-st.map(df_mapa)
 
-st.write("---")
+data_cerrillos = pd.DataFrame(data_dict)
 
-# 5. Sección de Análisis y Calculadora (Tu solución)
-left_col, right_col = st.columns(2)
 
-with left_col:
-    st.header("📊 Análisis de Demora")
-    st.write("Según nuestra lluvia de ideas y datos recolectados, estos son los tiempos promedio de espera hoy:")
-    
-    # Gráfico de barras comparativo
-    datos_espera = pd.DataFrame({
-        'Sector': ['Metro Cerrillos', 'Lo Errázuriz', 'Plaza Cerrillos'],
-        'Actual (min)': [18, 25, 15],
-        'Con Proyecto (min)': [10, 14, 8]
-    }).set_index('Sector')
-    
-    st.bar_chart(datos_espera)
+st.subheader("Tiempos de espera actuales")
+cols = st.columns(len(data_cerrillos)) 
 
-with right_col:
-    st.header("⏱️ Calcula tu Ahorro")
-    st.write("Ingresa tus datos para ver cómo te beneficiaría el proyecto:")
-    
-    minutos_hoy = st.number_input("¿Cuántos minutos esperas micro al día?", min_value=1, value=20)
-    
-    # Lógica de la solución (Supongamos un 40% de mejora)
-    ahorro = int(minutos_hoy * 0.4)
-    nuevo_tiempo = minutos_hoy - ahorro
-    
-    st.success(f"**Resultado:** Pasarías de esperar {minutos_hoy} min a solo **{nuevo_tiempo} min**.")
-    st.info(f"Ganarías **{ahorro} minutos** extras al día para estudiar o descansar.")
+for i, row in data_cerrillos.iterrows():
+    with cols[i]:
+        estado = "normal" if row['espera_actual'] < 15 else "critico"
+        st.metric(label=row['nombre'], value=f"{row['espera_actual']} min", delta=estado, delta_color="inverse")
 
-# 6. Pie de página
-st.write("---")
-st.caption("Proyecto desarrollado para el ramo Introducción a la Ingeniería - Universidad")
+        
+st.divider()
+
+st.subheader("Mapa de puntos críticos")
+
+m = folium.Map(location=[-33.5, -70.72], zoom_start=14, titles="cartodbpositron")
+
+for i, row in data_cerrillos.iterrows():
+    folium.CircleMarker(
+        location = [row['lat'], row['lon']],
+        radius = 10,
+        popup = f"{row['nombre']}: {row['espera_actual']} min de espera",
+        color = 'red' if row['espera_actual'] >= 15 else 'orange',
+        fill = True,
+        fill_opacity = 0.7
+).add_to(m)
+    
+st_folium(m, width="100%", height=500)
+
+st.info("💡 **Próxima actualización:** Integración de algoritmo de despacho dinámico y conexión con API de transporte público.")
